@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ramazon Tracker</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #0A3A2A;
+            --secondary: #D4AF37;
+            --accent: #1B5E44;
+            --light: #F5F1E8;
+            --white: #FFFFFF;
+            --text-dark: #1A1A1A;
+            --text-light: #666666;
+            --success: #2ECC71;
+            --warning: #F39C12;
+            --danger: #E74C3C;
+            --gradient-1: linear-gradient(135deg, #0A3A2A 0%, #1B5E44 100%);
+            --gradient-2: linear-gradient(135deg, #D4AF37 0%, #F4E4B4 100%);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.16);
+        }
+        body { font-family: 'DM Sans', sans-serif; background: var(--light); color: var(--text-dark); line-height: 1.6; overflow-x: hidden; padding-bottom: 20px; }
+
+        .hero { background: var(--gradient-1); color: var(--white); padding: 40px 20px 60px; position: relative; overflow: hidden; }
+        .hero::before { content: ''; position: absolute; top: -50%; right: -10%; width: 60%; height: 200%; background: radial-gradient(circle, rgba(212,175,55,0.1) 0%, transparent 70%); animation: float 20s ease-in-out infinite; }
+        @keyframes float { 0%,100%{transform:translate(0,0) rotate(0deg)} 33%{transform:translate(30px,-30px) rotate(5deg)} 66%{transform:translate(-20px,20px) rotate(-5deg)} }
+        .hero-content { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
+        .hero-badge { display: inline-block; background: rgba(212,175,55,0.2); color: var(--secondary); padding: 6px 16px; border-radius: 50px; font-size: 13px; font-weight: 600; margin-bottom: 15px; border: 1px solid rgba(212,175,55,0.3); }
+        .hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(28px,6vw,52px); font-weight: 900; line-height: 1.1; margin-bottom: 15px; }
+        .hero-subtitle { font-family: 'Syne', sans-serif; font-size: clamp(14px,3vw,18px); font-weight: 500; opacity: 0.9; margin-bottom: 25px; }
+        .hero-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 30px; }
+        .hero-stat { text-align: center; padding: 16px 12px; background: rgba(255,255,255,0.1); border-radius: 12px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+        .hero-stat-number { font-family: 'Syne', sans-serif; font-size: clamp(24px,5vw,32px); font-weight: 800; color: var(--secondary); display: block; margin-bottom: 4px; }
+        .hero-stat-label { font-size: 11px; opacity: 0.8; }
+
+        .container { max-width: 1400px; margin: -30px auto 0; padding: 0 16px 40px; position: relative; z-index: 2; }
+
+        /* Sync indicator */
+        .sync-bar { background: rgba(46,204,113,0.15); border: 1px solid rgba(46,204,113,0.3); border-radius: 10px; padding: 8px 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #1a7a4a; }
+        .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        .day-selector { background: var(--white); border-radius: 16px; padding: 16px; box-shadow: var(--shadow-md); margin-bottom: 20px; }
+        .day-selector-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .day-selector-label { font-family: 'Syne', sans-serif; font-weight: 700; color: var(--primary); font-size: 16px; }
+        .day-selector-buttons { display: grid; grid-template-columns: repeat(auto-fill,minmax(44px,1fr)); gap: 8px; }
+        .day-btn { height: 44px; border: 2px solid var(--light); background: var(--white); border-radius: 10px; font-family: 'Syne', sans-serif; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.3s; color: var(--text-dark); position: relative; }
+        .day-btn:hover { border-color: var(--accent); }
+        .day-btn.active { background: var(--gradient-1); color: var(--white); border-color: transparent; }
+        .day-btn.completed::after { content: '✓'; position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; background: var(--success); color: var(--white); border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--white); }
+
+        .nav-tabs { display: flex; gap: 6px; margin-bottom: 20px; background: var(--white); padding: 6px; border-radius: 14px; box-shadow: var(--shadow-md); overflow-x: auto; scrollbar-width: none; }
+        .nav-tabs::-webkit-scrollbar { display: none; }
+        .nav-tab { flex: 1; min-width: 80px; padding: 10px 8px; border: none; background: transparent; color: var(--text-light); font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; border-radius: 10px; transition: all 0.3s; text-align: center; }
+        .nav-tab::before { content: attr(data-emoji); font-size: 18px; display: block; margin-bottom: 2px; }
+        .nav-tab.active { background: var(--gradient-1); color: var(--white); box-shadow: var(--shadow-sm); }
+
+        .tab-content { display: none; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(15px)} to{opacity:1;transform:translateY(0)} }
+
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap: 16px; margin-bottom: 20px; }
+        .card { background: var(--white); border-radius: 16px; padding: 20px; box-shadow: var(--shadow-md); transition: all 0.3s; border: 1px solid rgba(0,0,0,0.06); }
+        .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid var(--light); }
+        .card-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--primary); }
+        .card-icon { font-size: 28px; }
+        .card-stats { display: flex; gap: 12px; font-size: 13px; color: var(--text-light); }
+
+        .task-list { display: flex; flex-direction: column; gap: 10px; }
+        .task-item { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--light); border-radius: 10px; cursor: pointer; transition: all 0.3s; border: 2px solid transparent; }
+        .task-item:hover { background: #EDE8DC; transform: translateX(3px); }
+        .task-item.completed { border-color: var(--success); background: rgba(46,204,113,0.08); }
+        .task-checkbox { width: 24px; height: 24px; border-radius: 6px; border: 3px solid var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.3s; }
+        .task-item.completed .task-checkbox { background: var(--success); border-color: var(--success); }
+        .task-checkbox-icon { color: var(--white); font-weight: bold; font-size: 16px; display: none; }
+        .task-item.completed .task-checkbox-icon { display: block; }
+        .task-content { flex: 1; }
+        .task-title { font-weight: 600; font-size: 14px; margin-bottom: 3px; }
+        .task-desc { font-size: 12px; color: var(--text-light); }
+        .task-time { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; color: var(--secondary); padding: 4px 10px; background: rgba(212,175,55,0.1); border-radius: 6px; }
+        .task-delete { width: 32px; height: 32px; border: none; background: rgba(231,76,60,0.1); color: var(--danger); border-radius: 8px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
+        .task-delete:hover { background: var(--danger); color: var(--white); }
+
+        .progress-section { background: var(--white); border-radius: 16px; padding: 24px; box-shadow: var(--shadow-md); margin-bottom: 20px; }
+        .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .progress-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--primary); }
+        .progress-percentage { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: var(--secondary); }
+        .progress-bar-container { height: 14px; background: var(--light); border-radius: 100px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: var(--gradient-2); border-radius: 100px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
+
+        /* Garden */
+        .garden { background: linear-gradient(180deg,#87CEEB 0%,#98D8C8 100%); border-radius: 20px; padding: 32px; min-height: 400px; position: relative; overflow: hidden; box-shadow: var(--shadow-lg); }
+        .garden::before { content:''; position: absolute; bottom:0; left:0; right:0; height:40%; background: linear-gradient(180deg,transparent 0%,#4A7C59 100%); }
+        .garden-stats { position: relative; z-index: 1; background: rgba(255,255,255,0.95); padding: 20px; border-radius: 16px; margin-bottom: 24px; box-shadow: var(--shadow-md); }
+        .garden-title { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 700; color: var(--primary); margin-bottom: 12px; text-align: center; }
+        .garden-description { text-align: center; color: var(--text-light); margin-bottom: 16px; font-size: 14px; }
+        .garden-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(70px,1fr)); gap: 16px; position: relative; z-index: 1; }
+        .garden-plant { text-align: center; cursor: pointer; transition: all 0.3s; filter: grayscale(100%); opacity: 0.3; }
+        .garden-plant.grown { filter: grayscale(0%); opacity: 1; animation: grow 0.5s ease; }
+        .garden-plant:hover.grown { transform: scale(1.15) rotate(5deg); }
+        @keyframes grow { 0%{transform:scale(0) rotate(-180deg);opacity:0} 50%{transform:scale(1.3) rotate(10deg)} 100%{transform:scale(1) rotate(0deg);opacity:1} }
+        .plant-icon { font-size: 44px; display: block; margin-bottom: 6px; }
+        .plant-label { font-size: 11px; font-weight: 600; color: var(--white); background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 8px; }
+
+        /* 99 Names */
+        .names-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); gap: 12px; }
+        .name-card { background: var(--gradient-1); color: var(--white); padding: 18px; border-radius: 14px; cursor: pointer; transition: all 0.3s; border: 2px solid transparent; }
+        .name-card:hover { transform: translateY(-4px); border-color: var(--secondary); box-shadow: 0 8px 24px rgba(212,175,55,0.3); }
+        .name-number { font-size: 11px; opacity: 0.6; margin-bottom: 4px; }
+        .name-arabic { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; color: var(--secondary); direction: rtl; }
+        .name-latin { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+        .name-meaning { font-size: 12px; opacity: 0.85; }
+        .name-desc { font-size: 11px; opacity: 0.7; margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 6px; line-height: 1.5; }
+
+        /* Zikr */
+        .zikr-card { background: var(--white); border-radius: 16px; padding: 20px; box-shadow: var(--shadow-md); margin-bottom: 16px; }
+        .zikr-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .zikr-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--primary); }
+        .zikr-arabic { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--accent); direction: rtl; margin-bottom: 6px; }
+        .zikr-icon { font-size: 28px; }
+        .zikr-desc { color: var(--text-light); font-size: 13px; margin-bottom: 6px; }
+        .zikr-fadl { font-size: 12px; color: var(--accent); font-style: italic; margin-bottom: 12px; padding: 8px; background: rgba(27,94,68,0.08); border-radius: 8px; }
+        .zikr-counter { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .zikr-count { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: var(--secondary); }
+        .zikr-target { font-size: 13px; color: var(--text-light); }
+        .zikr-buttons { display: grid; grid-template-columns: auto 1fr 1fr auto; gap: 8px; }
+
+        .btn { padding: 12px 20px; border: none; border-radius: 10px; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-primary { background: var(--gradient-1); color: var(--white); box-shadow: var(--shadow-sm); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .btn-secondary { background: var(--light); color: var(--text-dark); }
+        .btn-secondary:hover { background: #EDE8DC; }
+        .btn-danger { background: rgba(231,76,60,0.1); color: var(--danger); }
+        .btn-block { width: 100%; }
+
+        .modal { display: none; position: fixed; top:0;left:0;right:0;bottom:0; background: rgba(0,0,0,0.5); z-index: 1000; padding: 20px; overflow-y: auto; }
+        .modal.active { display: flex; align-items: center; justify-content: center; animation: fadeIn 0.3s ease; }
+        .modal-content { background: var(--white); border-radius: 20px; padding: 28px; max-width: 500px; width: 100%; box-shadow: var(--shadow-lg); animation: slideUp 0.3s ease; }
+        @keyframes slideUp { from{transform:translateY(50px);opacity:0} to{transform:translateY(0);opacity:1} }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; color: var(--primary); }
+        .modal-close { width: 36px; height: 36px; border: none; background: var(--light); border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
+        .modal-close:hover { background: var(--danger); color: var(--white); }
+
+        .form-group { margin-bottom: 16px; }
+        .form-label { font-size: 13px; font-weight: 600; color: var(--text-dark); margin-bottom: 6px; display: block; }
+        .form-input { width: 100%; padding: 12px; border: 2px solid var(--light); border-radius: 8px; font-size: 14px; font-family: inherit; transition: all 0.3s; background: var(--white); }
+        .form-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(27,94,68,0.1); }
+
+        .calendar-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 8px; margin-top: 16px; }
+        .calendar-day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--light); border-radius: 10px; cursor: pointer; transition: all 0.3s; border: 2px solid transparent; font-size: 14px; font-weight: 600; position: relative; }
+        .calendar-day:hover { border-color: var(--accent); }
+        .calendar-day.current { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(212,175,55,0.2); }
+        .calendar-day-progress { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 80%; height: 4px; background: rgba(0,0,0,0.1); border-radius: 2px; overflow: hidden; }
+        .calendar-day-progress-fill { height: 100%; background: var(--success); transition: width 0.3s; }
+
+        .quote-card { background: var(--gradient-1); color: var(--white); padding: 32px; border-radius: 20px; margin-bottom: 20px; position: relative; overflow: hidden; box-shadow: var(--shadow-lg); }
+        .quote-card::before { content:'"'; position: absolute; top:-20px; left:20px; font-size: 150px; font-family: 'Playfair Display', serif; opacity: 0.1; color: var(--secondary); }
+        .quote-text { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 600; line-height: 1.6; margin-bottom: 12px; position: relative; z-index: 1; }
+        .quote-source { font-size: 13px; opacity: 0.8; font-style: italic; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 12px; }
+        .stat-card { background: var(--white); padding: 20px; border-radius: 14px; text-align: center; box-shadow: var(--shadow-sm); transition: all 0.3s; }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+        .stat-icon { font-size: 32px; margin-bottom: 8px; }
+        .stat-number { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
+        .stat-label { font-size: 12px; color: var(--text-light); }
+
+        /* Names search */
+        .names-search { width: 100%; padding: 12px 16px; border: 2px solid var(--light); border-radius: 10px; font-family: inherit; font-size: 14px; margin-bottom: 16px; outline: none; transition: all 0.3s; }
+        .names-search:focus { border-color: var(--accent); }
+        .names-filter { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .filter-btn { padding: 6px 14px; border: 2px solid var(--light); background: var(--white); border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .filter-btn.active { background: var(--primary); color: var(--white); border-color: var(--primary); }
+
+        @media(max-width:768px) {
+            .hero { padding: 30px 16px 50px; }
+            .hero-stats { grid-template-columns: repeat(2,1fr); }
+            .cards-grid { grid-template-columns: 1fr; }
+            .calendar-grid { grid-template-columns: repeat(5,1fr); }
+        }
+        @media(max-width:480px) {
+            .hero-stats { grid-template-columns: repeat(2,1fr); }
+            .stats-grid { grid-template-columns: repeat(2,1fr); }
+            .names-grid { grid-template-columns: repeat(2,1fr); }
+        }
+
+        .save-button-mini {
+            background: var(--secondary); /* Tilla rang */
+            color: var(--primary);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            transition: all 0.2s ease;
+        }
+
+        .save-button-mini:active {
+            transform: scale(0.95);
+            box-shadow: none;
+        }
+
+        .progress-header {
+            margin-bottom: 10px;
+        }
+        
+    </style>
+</head>
+<body>
+
+<div class="hero">
+    <div class="hero-content">
+        <div class="hero-badge">🌙 Ramazon 1446</div>
+        <h1>Ramazon Tracker</h1>
+        <p class="hero-subtitle">30 kunlik to'liq o'zgarish — Har kungi amallaringizni kuzatib boring</p>
+        <div class="hero-stats">
+            <div class="hero-stat"><span class="hero-stat-number" id="currentDay">1</span><span class="hero-stat-label">Kun</span></div>
+            <div class="hero-stat"><span class="hero-stat-number" id="todayProgress">0%</span><span class="hero-stat-label">Bugun</span></div>
+            <div class="hero-stat"><span class="hero-stat-number" id="totalCompleted">0</span><span class="hero-stat-label">Bajarildi</span></div>
+            <div class="hero-stat"><span class="hero-stat-number" id="streakDays">0</span><span class="hero-stat-label">Streak</span></div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+
+    
+
+    <div class="day-selector">
+        <div class="day-selector-header">
+            <div class="day-selector-label">📅 Kunni tanlang</div>
+            <div style="font-size:12px;color:var(--text-light)"><span id="completedDaysCount">0</span>/30 kun to'liq</div>
+        </div>
+        <div class="day-selector-buttons" id="daySelectorButtons"></div>
+    </div>
+
+    <div class="nav-tabs">
+        <button class="nav-tab active" data-emoji="📋" onclick="switchTab('kunlik',this)">Kunlik</button>
+        <button class="nav-tab" data-emoji="🎯" onclick="switchTab('custom',this)">Maxsus</button>
+        <button class="nav-tab" data-emoji="📿" onclick="switchTab('zikr',this)">Zikr</button>
+        <button class="nav-tab" data-emoji="☪️" onclick="switchTab('names',this)">99 Ism</button>
+        <button class="nav-tab" data-emoji="🌿" onclick="switchTab('garden',this)">Bog'</button>
+        <button class="nav-tab" data-emoji="📊" onclick="switchTab('stats',this)">Stats</button>
+    </div>
+
+    <div id="kunlik" class="tab-content active">
+        <div class="quote-card">
+            <div class="quote-text">Kim Ramazon oyini iymon va savob umidida ro'za tutsa, uning o'tgan gunohlari mag'firat qilinadi</div>
+            <div class="quote-source">— Hadisi sharif (Buxoriy va Muslim)</div>
+        </div>
+        
+        <div class="progress-section">
+            <div class="progress-header" style="display: flex; align-items: center; justify-content: space-between;">
+                <div class="progress-title">Bugungi Progress</div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div class="progress-percentage" id="progressPercent">0%</div>
+                    <button onclick="manualSave()" class="save-button-mini">
+                        <span>💾</span> Saqlash
+                    </button>
+                </div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+            </div>
+        </div>
+        <div class="cards-grid" id="dailyTasksGrid"></div>
+    </div>
+
+    <!-- CUSTOM TAB -->
+    <div id="custom" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Mening Vazifalarim</div>
+                <button class="btn btn-primary" onclick="openAddTaskModal()">+ Qo'shish</button>
+            </div>
+            <div class="task-list" id="customTasksList"></div>
+        </div>
+    </div>
+
+    <!-- ZIKR TAB -->
+    <div id="zikr" class="tab-content">
+        <div class="quote-card">
+            <div class="quote-text">Allohni zikr qilganlar va zikr qilgan ayollar uchun Alloh mag'firat va ajri azim tayyorlab qo'ygan</div>
+            <div class="quote-source">— Qur'oni Karim, Al-Ahzob: 35</div>
+        </div>
+        <div id="zikrGrid"></div>
+    </div>
+
+    <!-- 99 ISMLAR TAB -->
+    <div id="names" class="tab-content">
+        <div class="quote-card">
+            <div class="quote-text">Allohning go'zal ismlari bor. Kim ularni esab bilsa, jannatga kiradi</div>
+            <div class="quote-source">— Hadisi sharif (Buxoriy)</div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Allohning 99 Ismi</div>
+                <div class="card-icon">✨</div>
+            </div>
+            <input type="text" class="names-search" placeholder="🔍 Ism yoki ma'no bo'yicha qidiring..." oninput="filterNames(this.value)">
+            <div class="names-filter">
+                <button class="filter-btn active" onclick="setNamesFilter('all',this)">Barchasi</button>
+                <button class="filter-btn" onclick="setNamesFilter('today',this)">Bugungi (3 ta)</button>
+            </div>
+            <div class="names-grid" id="namesGrid"></div>
+        </div>
+    </div>
+
+    <!-- BOG' TAB -->
+    <div id="garden" class="tab-content">
+        <div class="garden">
+            <div class="garden-stats">
+                <div class="garden-title">🌿 Sizning Jannat Bog'ingiz</div>
+                <p class="garden-description">Har bir to'liq kun (70%+) — bog'ingizda yangi o'simlik! <strong id="gardenCount">0</strong>/30</p>
+                <div class="progress-bar-container"><div class="progress-bar-fill" id="gardenProgress" style="width:0%"></div></div>
+            </div>
+            <div class="garden-grid" id="gardenGrid"></div>
+        </div>
+    </div>
+
+
+    <!-- STATS TAB -->
+    <div id="stats" class="tab-content">
+        <div class="quote-card">
+            <div class="quote-text">Alloh taolo albatta sabr qilganlar bilan</div>
+            <div class="quote-source">— Qur'oni Karim, Al-Baqara: 153</div>
+        </div>
+        <div class="stats-grid" id="statsGrid"></div>
+        <div class="card" style="margin-top:20px">
+            <div class="card-header"><div class="card-title">30 Kunlik Tarix</div><div class="card-icon">📈</div></div>
+            <div id="historyChart" style="padding:20px 0"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Task Modal -->
+<div class="modal" id="addTaskModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">Yangi Vazifa</div>
+            <button class="modal-close" onclick="closeAddTaskModal()">×</button>
+        </div>
+        <form id="addTaskForm">
+            <div class="form-group"><label class="form-label">Vazifa nomi *</label><input type="text" class="form-input" id="taskTitle" placeholder="Masalan: Qur'on o'qish" required></div>
+            <div class="form-group"><label class="form-label">Tavsif</label><input type="text" class="form-input" id="taskDesc" placeholder="Qo'shimcha ma'lumot"></div>
+            <div class="form-group"><label class="form-label">Vaqt</label><input type="time" class="form-input" id="taskTime"></div>
+            <button type="submit" class="btn btn-primary btn-block">✅ Qo'shish</button>
+        </form>
+    </div>
+</div>
+
+<script>
+// ===================== TELEGRAM =====================
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.expand(); tg.ready(); }
+
+const userId = tg?.initDataUnsafe?.user?.id || 'demo_' + Math.random().toString(36).substr(2,6);
+const userName = tg?.initDataUnsafe?.user?.first_name || 'Foydalanuvchi';
+
+// ===================== BOT GA YUBORISH =====================
+let syncTimer = null;
+// ===================== BOT GA YUBORISH (O'ZGARTIRILDI) =====================
+function syncToBot(type, data) {
+    // Har bir klikda botga yuborish o'chirildi
+    // Faqat brauzer xotirasiga saqlaymiz
+    tracker.saveUserData();
+    
+    // Vizual ko'rsatkich (ixtiyoriy)
+    const statusEl = document.getElementById('syncStatus');
+    if (statusEl) {
+        statusEl.textContent = '✍️ O‘zgarishlar kiritildi (Saqlashni bosing)';
+    }
+}
+
+// YANGI: Faqat shu funksiya chaqirilganda botga ma'lumot ketadi
+function manualSave() {
+    if (!tg) {
+        alert("Telegram muhiti topilmadi!");
+        return;
+    }
+
+    const d = tracker.getCurrentDayData();
+    const stats = tracker.getStats();
+
+    // Barcha ma'lumotlarni bitta paketga yig'amiz
+    const bulkData = {
+        type: "tasks_bulk",
+        day: tracker.currentDay,
+        dailyTasks: d.dailyTasks,
+        customTasks: d.customTasks,
+        zikrs: d.zikr,
+        progress: d.progress,
+        stats: stats
+    };
+
+    try {
+        // Botga bittada yuboramiz
+        tg.sendData(JSON.stringify(bulkData));
+        // Web Appni yopamiz (chunki ma'lumot ketgach, Telegram oynani yopishni tavsiya qiladi)
+        tg.close();
+    } catch (e) {
+        console.error("Saqlashda xato:", e);
+        alert("Xatolik yuz berdi!");
+    }
+}
+
+
+// ===================== MA'LUMOTLAR =====================
+
+const defaultDailyTasks = {
+    ibodat: [
+        { id:'dt1', title:'Bomdod namozi', desc:'Jamoat bilan yoki o\'z vaqtida'},
+        { id:'dt2', title:'Saharlik', desc:'Sog\'lom ovqat va duo'},
+        { id:'dt4', title:'Peshin,asr namozi', desc:'Vaqtida o\'qish'},
+        { id:'dt6', title:'Iftor va Shom', desc:'Duo bilan og\'iz ochish'},
+        { id:'dt7', title:'Xufton namozi', desc:'Vaqtida o\'qish' },
+        { id:'dt8', title:'Taroveh', desc:'20 rakat taroveh namozi' },
+    ],
+    ilm: [
+        { id:'dt9', title:'O\'z ilmingizni o\'rganing ', desc:'kuniga 4-5 soat'},
+        { id:'dt10', title:'Maruza eshiting', desc:'Kuniga kamida 1soat eshiting'},
+        { id:'dt11', title:'Diniy dars', desc:'Kuniga kamida 1 soat'},
+        { id:'dt12', title:'Yo\'lingizdagi yangi ilmlarni o\'rganing', desc:'Kamida 2 soat'},
+    ],
+    axloq: [
+        { id:'dt23', title:'Ota-onaga xizmat', desc:'Yordam va duo qilish', time:'' },
+        { id:'dt13', title:'Qarindoshlarga siylayi rahm', desc:'Telefon yoki tashrif', time:'' },
+        { id:'dt14', title:'Yaxshi so\'z', desc:'Muloyim muomala qilish', time:'' },
+        { id:'dt20', title:'Yolg\'on gapirmaslik', desc:'yolg\'ondan tilni tiyish', time:'' },
+        { id:'dt22', title:'Haqorat qilmaslik', desc:'haqoratli gap,so\'zlardan tilni tiyish', time:'' },
+    ],
+    nafs: [
+        { id:'dt15', title:'Mo\'tadil uyqu', desc:'6-7 soat me\'yorida uxlash', time:'' },
+        { id:'dt16', title:'Telefon kamaytirish', desc:'Faqat zarur holda ishlatish', time:'' },
+        { id:'dt17', title:'Mo\'tadil ovqat', desc:'Haddan oshmaslik, isrof qilmaslik', time:'' },
+        { id:'dt21', title:'Ko\'zni tiyish', desc:'Nomahramlardan ko\'zni tiyish', time:'' },
+    ],
+    sadaqa: [
+        { id:'dt18', title:'Kunlik sadaqa', desc:'Qo\'ldan kelganicha berish', time:'' },
+        { id:'dt19', title:'Muhtojlarga yordam', desc:'Ovqat, pul yoki vaqt berish', time:'' },
+        { id:'dt23', title:'Ota onaga go\'zal muomala qilish', desc:'Ota-onaga go\'zal muomalada bo\'lish ham sadaqadir', time:'' },
+    ],
+};
+
+// ===================== ZIKRLAR (kengaytirilgan) =====================
+const zikrList = [
+    {
+        id:'z1', title:'Subhanalloh', arabic:'سُبْحَانَ اللَّهِ',
+        desc:'Alloh barcha nuqsonlardan pokdir', target:33, icon:'📿',
+        fadl:'Kim bir kunda 100 marta subhanalloh desa, 1000 ta yaxshi amal yoziladi va 1000 ta gunohi o\'chiriladi'
+    },
+    {
+        id:'z2', title:'Alhamdulillah', arabic:'الْحَمْدُ لِلَّهِ',
+        desc:'Barcha hamd va shukr faqat Allohga tegishlidir', target:33, icon:'🙏',
+        fadl:'Alhamdulillah — mizonni to\'ldiruvchi duo. Bu duo tilni va fikrni doim Alloh zikrida tutadi'
+    },
+    {
+        id:'z3', title:'Allohu Akbar', arabic:'اللَّهُ أَكْبَرُ',
+        desc:'Alloh hamma narsadan buyukroqdir', target:33, icon:'✨',
+        fadl:'Subhanalloh, Alhamdulillah, Allohu Akbar — ular menga yer yuzidagi barcha narsadan sevimlidir (Hadis)'
+    },
+    {
+        id:'z4', title:'La ilaha illalloh', arabic:'لَا إِلَهَ إِلَّا اللَّهُ',
+        desc:'Allohdan boshqa haqiqiy iloh yo\'q', target:100, icon:'☪️',
+        fadl:'Eng yaxshi zikr La ilaha illallohdur. (Tirmiziy) — Bu kalima jannat kaliti'
+    },
+    {
+        id:'z5', title:'Astag\'furulloh', arabic:'أَسْتَغْفِرُ اللَّهَ',
+        desc:'Allohdan gunohlarni mag\'firat qilishini so\'rayman', target:100, icon:'🤲',
+        fadl:'Kim ko\'p istig\'for aytsa, Alloh unga har qayg\'udan chiqish yo\'li, har torliqdan kenglik va kutmagan joydan rizq beradi'
+    },
+    {
+        id:'z6', title:'Salovot', arabic:'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ',
+        desc:'Allohim, Muhammadga rahmat yubor', target:100, icon:'💚',
+        fadl:'Kim menga bir marta salovot aytsa, Alloh unga o\'n marta rahmat yuboradi (Muslim)'
+    },
+    {
+        id:'z7', title:'Hasbi Alloh', arabic:'حَسْبِيَ اللَّهُ وَنِعْمَ الْوَكِيلُ',
+        desc:'Alloh menga yetarlidir, U eng yaxshi Vakil', target:7, icon:'🌟',
+        fadl:'Ibrohim as. otiga tashlanganda, Yunus as. baliq qornida, Muhammad saw. qiyinchiliklarida shu duoni aytganlar'
+    },
+    {
+        id:'z8', title:'La hawla wala quwwata', arabic:'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ',
+        desc:'Kuch-quvvat faqat Alloh ixtiyorida', target:100, icon:'⚡',
+        fadl:'Bu zikr jannat xazinalaridan biridir. Har qiyin ishda kuch olish uchun aytiladi (Buxoriy)'
+    },
+    {
+        id:'z9', title:'Rabbig\'fir warham', arabic:'رَبِّ اغْفِرْ وَارْحَمْ',
+        desc:'Ey Rabbim, mag\'firat qil va rahm ayla', target:100, icon:'💫',
+        fadl:'Qur\'onda qayd etilgan duo. Gunohlarni yuvish va Alloh rahmatini jalb qilish uchun'
+    },
+    {
+        id:'z10', title:'Allohuma inni as\'aluka', arabic:'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْجَنَّةَ',
+        desc:'Ey Alloh, senden jannatni so\'rayman', target:3, icon:'🌺',
+        fadl:'Kim uch marta jannatni so\'rasa, jannat: "Allohim, uni jannatga kiritvoring" der (Tirmiziy)'
+    },
+    {
+        id:'z11', title:'Subhanalloh wa bihamdihi', arabic:'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ',
+        desc:'Alloh pokdir va barcha hamd Unga tegishli', target:100, icon:'🕊️',
+        fadl:'Kim bir kunda 100 marta aytsa, dengiz ko\'pigiday gunohlari kechiriladi (Buxoriy va Muslim)'
+    },
+    {
+        id:'z12', title:'Subhanallohil azim', arabic:'سُبْحَانَ اللَّهِ الْعَظِيمِ',
+        desc:'Ulug\' Alloh barcha nuqsonlardan pokdir', target:100, icon:'🌙',
+        fadl:'Bu ikkita ibora tillarda yengil, Mizonlarda og\'ir va Rahmon sevgan ibora (Buxoriy)'
+    },
+];
+
+// ===================== ALLOHNING 99 ISMI =====================
+const allahNames = [
+    { n:1, arabic:'اللَّهُ', latin:'Alloh', meaning:'Yagona Yaratuvchi', desc:'Barcha mavjudotning Xoliq va Robbidir. Bu ism Allohning o\'z ismi bo\'lib, boshqa ism va sifatlarini o\'z ichiga oladi' },
+    { n:2, arabic:'الرَّحْمَنُ', latin:'Ar-Rahman', meaning:'Mehribon', desc:'Dunyoda barcha mavjudotga — mo\'min va kafirga — rahmat ko\'rsatuvchi. Rahmati barcha narsani qamrab olgan' },
+    { n:3, arabic:'الرَّحِيمُ', latin:'Ar-Rahim', meaning:'Rahmli', desc:'Oxiratda faqat mo\'minlarga xos maxsus rahmat ko\'rsatuvchi. Bandalar tavba qilganida ularni kechiruvchi' },
+    { n:4, arabic:'الْمَلِكُ', latin:'Al-Malik', meaning:'Podshoh', desc:'Koinotning mutlaq Hukmdori. Hech kimning iznisiz hukm yuritish huquqi yo\'q. Barcha mulk Unga tegishli' },
+    { n:5, arabic:'الْقُدُّوسُ', latin:'Al-Quddus', meaning:'Muqaddas', desc:'Barcha nuqson, kamchilik va yetishmovchilikdan butunlay pok. Farishtalar ham Uni muqaddas deb tasbihu tahlil qiladi' },
+    { n:6, arabic:'السَّلاَمُ', latin:'As-Salam', meaning:'Tinchlik beruvchi', desc:'O\'zi barcha nuqsondan salomat. Bandalariga ham tinchlik va salomatlik beruvchi. Jannat salomlashish joyi' },
+    { n:7, arabic:'الْمُؤْمِنُ', latin:'Al-Mu\'min', meaning:'Iymon beruvchi', desc:'Bandalariga xavfsizlik va iymon beruvchi. O\'z payg\'ambarlarini mo\'jizalar bilan tasdiqlovchi' },
+    { n:8, arabic:'الْمُهَيْمِنُ', latin:'Al-Muhaimin', meaning:'Qo\'rilovchi', desc:'Barcha narsani kuzatib, himoya qilib, nazorat qilib turuvchi. Hech narsa Uning nazaridan chetda qolmaydi' },
+    { n:9, arabic:'الْعَزِيزُ', latin:'Al-Aziz', meaning:'Qudratli', desc:'Hech kim Uni mag\'lub eta olmaydigan mutlaq qudrat sohibi. Uning irodasiga qarshilik qilish mumkin emas' },
+    { n:10, arabic:'الْجَبَّارُ', latin:'Al-Jabbar', meaning:'Majburlovchi', desc:'O\'z irodasini bajarishga hech kim to\'sqinlik qila olmaydi. Buzilgan narsalarni tuzatuvchi va kuchlilarga jazosi bor' },
+    { n:11, arabic:'الْمُتَكَبِّرُ', latin:'Al-Mutakabbir', meaning:'Ulug\'', desc:'Barcha narsadan buyuk va ulug\'. Ulug\'lik faqat Unga xos. Bandalar mutakabbirlik qilsa, bu kibr hisoblanadi' },
+    { n:12, arabic:'الْخَالِقُ', latin:'Al-Xoliq', meaning:'Yaratuvchi', desc:'Hamma narsani yo\'qdan bor qiluvchi. Yaratilanlarning hech biri yaratish qudratiga ega emas' },
+    { n:13, arabic:'الْبَارِئُ', latin:'Al-Bori\'', meaning:'Ijodkor', desc:'Yaratgan narsalarini bir-biridan ajratib, har biriga o\'z shakl va xususiyat beruvchi. Farqlovchi Yaratuvchi' },
+    { n:14, arabic:'الْمُصَوِّرُ', latin:'Al-Musavvir', meaning:'Shakl beruvchi', desc:'Har bir mavjudotga o\'ziga xos ko\'rinish va surat beruvchi. Onalari qornidagi bolalarga shaklini beruvchi' },
+    { n:15, arabic:'الْغَفَّارُ', latin:'Al-G\'affar', meaning:'Ko\'p mag\'firat qiluvchi', desc:'Bandalarining gunohlarini ko\'p va qayta-qayta mag\'firat qiluvchi. Tavba qilganlarni yashiruvchi va kechiruvchi' },
+    { n:16, arabic:'الْقَهَّارُ', latin:'Al-Qahhar', meaning:'Qahr qiluvchi', desc:'Barcha narsani Uning irodasiga bo\'ysundiradigan Mutlaq Hokimiyat egasi. Zo\'ravonlarga qahrini ko\'rsatuvchi' },
+    { n:17, arabic:'الْوَهَّابُ', latin:'Al-Vahhob', meaning:'Hadya qiluvchi', desc:'Hech qanday evaz va kutish bilan emas, balki sof saxovat bilan hadya qiluvchi. Barcha ne\'matlar Undan' },
+    { n:18, arabic:'الرَّزَّاقُ', latin:'Ar-Razzaq', meaning:'Rizq beruvchi', desc:'Barcha tirik mavjudotlarga rizq va to\'kin-sochinlik beruvchi. Hech bir bandaning rizqini Undan boshqasi bera olmaydi' },
+    { n:19, arabic:'الْفَتَّاحُ', latin:'Al-Fattoh', meaning:'Ochuvchi', desc:'Muammolarni hal qiluvchi, yopiq eshiklarni ochuvchi. Qiyomat Kuni haqiqatni oydinlashtiruvchi Hukmdor' },
+    { n:20, arabic:'الْعَلِيمُ', latin:'Al-Alim', meaning:'Biluvchi', desc:'Hamma narsani — ochiq va yashirin, o\'tgan va kelgusini — to\'liq biladigan. Hech narsa Undan yashirinmaydi' },
+    { n:21, arabic:'الْقَابِضُ', latin:'Al-Qobiz', meaning:'Qisuvchi', desc:'Rizqni, ruhlarni va barcha narsani Uning hukmi va hikmati bilan qabz qiluvchi. Hamma narsa Uning qo\'lida' },
+    { n:22, arabic:'الْبَاسِطُ', latin:'Al-Bosit', meaning:'Kengaytiruvchi', desc:'Rizqni kengaytirib, ne\'matlarni yoyuvchi. Qabz va Bast ikkisi birga Uning adolatli taqsimotining ikki yonidir' },
+    { n:23, arabic:'الْخَافِضُ', latin:'Al-Xofiz', meaning:'Pastlovchi', desc:'Kofirlar va zolimlarni past qiluvchi. Hamma narsaning taqdiri Uning qo\'lida — xohlaganini ko\'tarar, xohlaganini tushirar' },
+    { n:24, arabic:'الرَّافِعُ', latin:'Ar-Rofi\'', meaning:'Ko\'taruvchi', desc:'Mo\'minlarni, avliyolarni va ilm ahli martabasini ko\'taruvchi. Dunyo va oxiratda izzatni faqat U beradi' },
+    { n:25, arabic:'الْمُعِزُّ', latin:'Al-Mu\'izz', meaning:'Izzat beruvchi', desc:'Xohlaganiga izzat va sharaf beruvchi. Haqiqiy izzat Allohniki va Uning xohishiga ko\'ra bandalariga beriladi' },
+    { n:26, arabic:'الْمُذِلُّ', latin:'Al-Muzill', meaning:'Xor qiluvchi', desc:'Xohlaganini xorlovchi. Allohga isyon qilganlar va kibr qilganlar oxir-oqibat xor va zor bo\'ladilar' },
+    { n:27, arabic:'السَّمِيعُ', latin:'As-Sami\'', meaning:'Eshituvchi', desc:'Hamma narsani — ochiq va sir aytilganlarni, hatto yurak ichidagi g\'amg\'usalarni ham eshituvchi' },
+    { n:28, arabic:'الْبَصِيرُ', latin:'Al-Basir', meaning:'Ko\'ruvchi', desc:'Hamma narsani — zulmat ichidagi qoraygan toshning tagidagi qoraygan chumolini ham — ko\'ruvchi' },
+    { n:29, arabic:'الْحَكَمُ', latin:'Al-Hakam', meaning:'Hukm qiluvchi', desc:'Barcha nizolarning Adolatli Hakami. Uning hukmi qaytarib bo\'lmaydi. Qiyomat Kuni To\'liq Adolat sodir bo\'ladi' },
+    { n:30, arabic:'الْعَدْلُ', latin:'Al-Adl', meaning:'Adolatli', desc:'Mutlaq Adolat sohibi. Hech kimga zulm qilmaydi. Har ishning to\'g\'ri bahosini beradi. Adolat — Uning sifati' },
+    { n:31, arabic:'اللَّطِيفُ', latin:'Al-Latif', meaning:'Lutfli', desc:'Bandalariga nozik va nazardan yashirin yo\'llar bilan foyda yetkazuvchi. Har bir latif ishdan boxabar' },
+    { n:32, arabic:'الْخَبِيرُ', latin:'Al-Xabir', meaning:'Xabardor', desc:'Barcha narsaning ichki va tashqi tomonini, hatto yurak sirlarini ham biladigan. Hech bir xabar Undan yashirinmaydi' },
+    { n:33, arabic:'الْحَلِيمُ', latin:'Al-Halim', meaning:'Bag\'rikeng', desc:'Bandalarining gunohlariga qaramay, darhol jazoga shoshilmaydigan. Ularga tavba qilishlari uchun muhlat beruvchi' },
+    { n:34, arabic:'الْعَظِيمُ', latin:'Al-Azim', meaning:'Ulug\'vor', desc:'Aql idrok eta olmaydigan darajadagi buyuk ulug\'lik egasi. Farishtalar ham Uning ulug\'ligidan hayratda' },
+    { n:35, arabic:'الْغَفُورُ', latin:'Al-G\'afur', meaning:'Kechiruvchi', desc:'Ko\'p va to\'liq mag\'firat qiluvchi. Tavba qilganlarning barcha gunohlarini — katta va kichik — kechiruvchi' },
+    { n:36, arabic:'الشَّكُورُ', latin:'Ash-Shakur', meaning:'Shukrli', desc:'Bandalarining oz amali uchun ko\'p savob beruvchi. Hech bir yaxshi amal Uning nazaridan chetda qolmaydi' },
+    { n:37, arabic:'الْعَلِيُّ', latin:'Al-Aliyy', meaning:'Yuksak', desc:'Mutlaq yuksak. Barcha mavjudotdan yuqori va ulug\'. Uning makoni ham, ilmi ham, qudrati ham eng yuksak' },
+    { n:38, arabic:'الْكَبِيرُ', latin:'Al-Kabir', meaning:'Buyuk', desc:'Zot va sifatlari jihatidan cheksiz buyuk. Hech bir aql Uning buyukligini to\'liq idrok eta olmaydi' },
+    { n:39, arabic:'الْحَفِيظُ', latin:'Al-Hafiz', meaning:'Asrovchi', desc:'Barcha mavjudotni, ayniqsa bandalarining amallarini asrovchi va yozib qo\'yuvchi. Muhofaza qiluvchi' },
+    { n:40, arabic:'الْمُقِيتُ', latin:'Al-Muqit', meaning:'Oziq beruvchi', desc:'Barcha mavjudotga kerakli oziq-ovqat va kuchni yetkazuvchi. Hech bir jon Uning rizqisiz tirik qolmaydi' },
+    { n:41, arabic:'الْحَسِيبُ', latin:'Al-Hasib', meaning:'Hisobchi', desc:'Qiyomat Kuni barcha bandalarning amallarini to\'liq hisoblovchi. Zarra qadar yaxshi yoki yomon amal unutilmaydi' },
+    { n:42, arabic:'الْجَلِيلُ', latin:'Al-Jalil', meaning:'Ulug\'lik egasi', desc:'Mutlaq ulug\'lik, qudrat va sharaf sohibi. Uning oldida barcha boshlar egiladi, barcha dil qo\'rquvdan titraydi' },
+    { n:43, arabic:'الْكَرِيمُ', latin:'Al-Karim', meaning:'Saxiy', desc:'Cheksiz saxovatli. So\'ragan va so\'ramaganga beruvchi. Insonlarning umidlarini oshirib qaytaruvchi' },
+    { n:44, arabic:'الرَّقِيبُ', latin:'Ar-Raqib', meaning:'Kuzatuvchi', desc:'Hamma narsani doim kuzatib turuvchi. Bandalarining har bir amali, so\'zi va niyati Unga ma\'lum' },
+    { n:45, arabic:'الْمُجِيبُ', latin:'Al-Mujib', meaning:'Ijobat qiluvchi', desc:'Qilingan duolarni qabul qiluvchi. Kim Unga chin dildan yuzlanib duo qilsa, U albatta ijobat qiladi' },
+    { n:46, arabic:'الْوَاسِعُ', latin:'Al-Vosi\'', meaning:'Keng', desc:'Ilmi, rahmat, mag\'firat va qudrati cheksiz keng. Hech narsa Uning ilmidan va rahmatidan tashqarida qolmaydi' },
+    { n:47, arabic:'الْحَكِيمُ', latin:'Al-Hakim', meaning:'Hikmatli', desc:'Hamma narsani o\'z o\'rniga to\'g\'ri qo\'yuvchi. Barcha qonun va qoidalarida chuqur hikmat bor, biz ko\'p narsani bilmaymiz' },
+    { n:48, arabic:'الْوَدُودُ', latin:'Al-Vadud', meaning:'Sevuvchi', desc:'Mo\'min bandalarini sevuvchi va ular tomonidan seviluvchi. Allohga yaqin bo\'lgan bandalarni bir-biriga ham sevdiruvchi' },
+    { n:49, arabic:'الْمَجِيدُ', latin:'Al-Majid', meaning:'Ulug\'vorlik egasi', desc:'Ulug\'lik, sharaf va izzat sohibi. Uning ulug\'ligi cheksiz. Arshning sohibi Majid — Ulug\'vor' },
+    { n:50, arabic:'الْبَاعِثُ', latin:'Al-Bo\'is', meaning:'Qo\'zg\'atuvchi', desc:'O\'liklarni qayta tiriltirib, Qiyomat Kuni ularni hisob-kitob uchun qo\'zg\'atuvchi. Payg\'ambarlar yuboruvchi' },
+    { n:51, arabic:'الشَّهِيدُ', latin:'Ash-Shahid', meaning:'Guvoh', desc:'Hamma narsaning, har bir lahzaning va har bir sirning Guvohidir. Hech narsa Undan yashirinmaydi' },
+    { n:52, arabic:'الْحَقُّ', latin:'Al-Haqq', meaning:'Haqiqiy', desc:'O\'zi va sifatlari mutlaq haqiqiy. Uning va\'dalari haq. Unga ibodat qilish haq. Hamma haq Undan' },
+    { n:53, arabic:'الْوَكِيلُ', latin:'Al-Vakil', meaning:'Ishonchli vakil', desc:'Bandalarining ishlarini o\'z zimmaga oluvchi va boshqarib turuvchi. Unga tavakkal qilgan hech qachon yolg\'iz emas' },
+    { n:54, arabic:'الْقَوِيُّ', latin:'Al-Qaviyy', meaning:'Kuchli', desc:'Mutlaq kuch va qudrat sohibi. Hech qanday kuch Uning kuchiga tengisha olmaydi. U charchamas va toqati to\'lmaydi' },
+    { n:55, arabic:'الْمَتِينُ', latin:'Al-Matin', meaning:'Mustahkam', desc:'Qudrati o\'ta mustahkam va baquvvat. Hech narsa Uning irodasiga to\'sqinlik qila olmaydi' },
+    { n:56, arabic:'الْوَلِيُّ', latin:'Al-Valiyy', meaning:'Dost', desc:'Mo\'min bandalarning Yordamchisi va Muhofazachisi. U mo\'minlarni zulmatdan nurga chiqaradi' },
+    { n:57, arabic:'الْحَمِيدُ', latin:'Al-Hamid', meaning:'Maqtovga loyiq', desc:'Barcha hamd va maqtov O\'ziga loyiq. O\'z zoti, sifatlari va fe\'llari jihatidan doim maqtovga sazovor' },
+    { n:58, arabic:'الْمُحْصِي', latin:'Al-Muhsi', meaning:'Hisoblovchi', desc:'Hamma narsani sanab-hisoblovchi. Koinotdagi barcha zarralar, amallar va so\'zlar Uning ilmida hisobda' },
+    { n:59, arabic:'الْمُبْدِئُ', latin:'Al-Mubdi\'', meaning:'Boshlovchi', desc:'Hamma narsani birinchi marta yo\'qdan bor qiluvchi. Hayotni birinchi bor boshlovchi Yaratuvchi' },
+    { n:60, arabic:'الْمُعِيدُ', latin:'Al-Mu\'id', meaning:'Qaytaruvchi', desc:'O\'liganlarni Qiyomat Kuni qayta tiriltirib, dunyodagi holati bilan qaytaruvchi' },
+    { n:61, arabic:'الْمُحْيِي', latin:'Al-Muhyi', meaning:'Tiriltirguvchi', desc:'O\'liklarni tiriltirib, ularga hayot beruvchi. Ruhni jasadga kirituvchi va hayot ne\'matini in\'om etuvchi' },
+    { n:62, arabic:'الْمُمِيتُ', latin:'Al-Mumit', meaning:'O\'ldiruvchi', desc:'Xohlagandida jonni oluvchi. Hamma jon o\'limni tatib ko\'radi. Hayot va o\'lim faqat Uning qo\'lida' },
+    { n:63, arabic:'الْحَيُّ', latin:'Al-Hayy', meaning:'Tirik', desc:'O\'Zi azaliy va abadiy hayot egasi. Hech qachon o\'lmaydi va uyquga ketmaydi. Barcha hayot Undan' },
+    { n:64, arabic:'الْقَيُّومُ', latin:'Al-Qayyum', meaning:'Doimiy turuvchi', desc:'O\'z-O\'zi bilan qoim va barcha narsaning qoimiyatini ta\'minlovchi. Hech narsaga muhtoj emas' },
+    { n:65, arabic:'الْوَاجِدُ', latin:'Al-Vojid', meaning:'Topuvchi', desc:'Xohlaganini topuvchi va boyligidan hech narsa yetishmovchi. Barcha ne\'mat Uning xazinasidan' },
+    { n:66, arabic:'الْمَاجِدُ', latin:'Al-Mojid', meaning:'Sharafli', desc:'Ulug\'lik va sharaf sohibi. Ulug\'ligi cheksiz, saxovati to\'lin-to\'kis, mehri bepoyon' },
+    { n:67, arabic:'الْوَاحِدُ', latin:'Al-Vohid', meaning:'Yagona', desc:'Zoti, sifatlari va fe\'llari jihatidan hech qanday sherik va o\'xshashi yo\'q Yagona' },
+    { n:68, arabic:'الْأَحَدُ', latin:'Al-Ahad', meaning:'Bir', desc:'Mutlaq birlik egasi. Hech qanday bo\'linish, qism va sherik qabul qilmaydigan Birdan Bir Iloh' },
+    { n:69, arabic:'الصَّمَدُ', latin:'As-Samad', meaning:'Muhtoj qiluvchi', desc:'Hamma Unga muhtoj, U hech kimga muhtoj emas. Barcha ehtiyojlar Unga qaratiladi' },
+    { n:70, arabic:'الْقَادِرُ', latin:'Al-Qodir', meaning:'Qodir', desc:'Xohlaganini qilishga qodir. Hech narsa Uning qudratidan tashqarida emas. Hamma narsa Unga bo\'ysunadi' },
+    { n:71, arabic:'الْمُقْتَدِرُ', latin:'Al-Muqtadir', meaning:'Kuchli Qodir', desc:'O\'z irodasini to\'liq va mukammal amalga oshirishga qodir. Kuch va qudratning to\'liq egasi' },
+    { n:72, arabic:'الْمُقَدِّمُ', latin:'Al-Muqaddim', meaning:'Oldinga surishchi', desc:'Xohlaganini oldinga surib, ularga ustuvorlik beruvchi. Hamma narsa Uning tartibiga ko\'ra joylashadi' },
+    { n:73, arabic:'الْمُؤَخِّرُ', latin:'Al-Mu\'axxir', meaning:'Orqaga qoldiruvchi', desc:'Xohlaganini orqaga surishchi va ularga keyinchalik o\'z o\'rnini beruvchi. Hamma tartibi Uning hikmati' },
+    { n:74, arabic:'الْأَوَّلُ', latin:'Al-Avval', meaning:'Birinchi', desc:'Hamma narsadan oldin mavjud bo\'lgan. Uning boshlanishi yo\'q. Azaliy va qadimiy Iloh' },
+    { n:75, arabic:'الْآخِرُ', latin:'Al-Oxir', meaning:'Oxirgi', desc:'Hamma narsa o\'tgandan so\'ng ham qoladigon. Nihoyasi yo\'q. Abadiy va baqa egasi' },
+    { n:76, arabic:'الظَّاهِرُ', latin:'Az-Zohir', meaning:'Zohir', desc:'Belgi va dalillari bilan ayon va zohir. Koinotdagi hamma narsa Uning mavjudligiga dalolat qiladi' },
+    { n:77, arabic:'الْبَاطِنُ', latin:'Al-Botin', meaning:'Yashirin', desc:'Zoti jihatidan aql idrok eta olmaydigan tarzda yashirin. Hech kim Uning zotini to\'liq bila olmaydi' },
+    { n:78, arabic:'الْوَالِي', latin:'Al-Voli', meaning:'Hukmdor', desc:'Barcha koinotni boshqaruvchi va idora qiluvchi. Hukm va tasarruf faqat Uning qo\'lida' },
+    { n:79, arabic:'الْمُتَعَالِي', latin:'Al-Muta\'ali', meaning:'O\'ta yuksak', desc:'Barcha idrok va tasavvurdan o\'ta yuksak. Hech bir aql Uning ulug\'ligini to\'liq qamrab ololmaydi' },
+    { n:80, arabic:'الْبَرُّ', latin:'Al-Barr', meaning:'Yaxshilik qiluvchi', desc:'Bandalariga ko\'p yaxshilik qiluvchi, ularni sevuvchi va ularga naf keltiruvchi. Xayrning manbai' },
+    { n:81, arabic:'التَّوَّابُ', latin:'At-Tavvob', meaning:'Tavbani qabul qiluvchi', desc:'Bandalarining tavbasini bor quvvat bilan qabul qiluvchi. Ularni tavbaga boshlash uchun tawfiq beruvchi' },
+    { n:82, arabic:'الْمُنْتَقِمُ', latin:'Al-Muntaqim', meaning:'Qasos oluvchi', desc:'Zolimlardan va isyonkorlardan adolatli qasos oluvchi. Hech bir zulm jazolanmasdan qolmaydi' },
+    { n:83, arabic:'الْعَفُوُّ', latin:'Al-Afuvv', meaning:'Afv qiluvchi', desc:'Bandalarining gunohlarini kechiruvchi va ularsiz go\'yo bo\'lmaganday qabul qiluvchi. Ko\'p afv qiluvchi' },
+    { n:84, arabic:'الرَّؤُوفُ', latin:'Ar-Ra\'uf', meaning:'Shafqatli', desc:'O\'ta shafqat va rahm ko\'rsatuvchi. Bandalariga bo\'lgan mehri va muruvvati cheksiz' },
+    { n:85, arabic:'مَالِكُ الْمُلْكِ', latin:'Malikal Mulk', meaning:'Mulk Egasi', desc:'Barcha mulk va hokimiyatning To\'liq Egasi. Mulkni xohlaganiga beradi, xohlaganidan oladi' },
+    { n:86, arabic:'ذُو الْجَلَالِ وَالْإِكْرَامِ', latin:'Zul Jalali wal Ikrom', meaning:'Jalol va Ikrom sohibi', desc:'Mutlaq ulug\'lik va cheksiz karamu saxovat sohibi. Bu ism Allohning eng ulug\' ismlaridan biri' },
+    { n:87, arabic:'الْمُقْسِطُ', latin:'Al-Muqsit', meaning:'Adolatli', desc:'Barcha ishlarida mutlaq adolat bilan muomala qiluvchi. Hech kimga zulm qilmaydigan va qildirishga yo\'l qo\'ymaydigan' },
+    { n:88, arabic:'الْجَامِعُ', latin:'Al-Jomi\'', meaning:'To\'plovchi', desc:'Qiyomat Kuni barcha insoniyatni hisob-kitob uchun to\'plovchi. Hamma ziddiyatlarni birlashtirib boshqaruvchi' },
+    { n:89, arabic:'الْغَنِيُّ', latin:'Al-G\'aniyy', meaning:'Behtoj', desc:'Hech bir narsaga muhtoj emas. Barcha ne\'mat va boyliklar Undadir. Hammani rizqlantirib, O\'zi mustahkam turar' },
+    { n:90, arabic:'الْمُغْنِي', latin:'Al-Mug\'ni', meaning:'Boy qiluvchi', desc:'Xohlaganlarini boyituvchi va ehtiyojlarini qondiruvchi. Haqiqiy boylikni faqat U beradi' },
+    { n:91, arabic:'الْمَانِعُ', latin:'Al-Moni\'', meaning:'To\'sqinlovchi', desc:'Xohlaganiga to\'sqinlik qilib, zarardan asrovchi. Ba\'zan to\'sqinlik rahmat, ba\'zan jazodur' },
+    { n:92, arabic:'الضَّارُّ', latin:'Az-Zorr', meaning:'Zarar yetkazuvchi', desc:'Xohlaganiga Uning hikmati bilan zarar yetkazuvchi. Zarar va foyda Uning qo\'lida. Hammasi hikmat bilan' },
+    { n:93, arabic:'النَّافِعُ', latin:'An-Nofi\'', meaning:'Foyda yetkazuvchi', desc:'Xohlaganiga foyda va ne\'mat yetkazuvchi. Haqiqiy foyda faqat Undan. Bandalar faqat vosita xolos' },
+    { n:94, arabic:'النُّورُ', latin:'An-Nur', meaning:'Nur', desc:'O\'Zi mutlaq Nur va barcha nurlarning manbai. Osmon va yerning Nuri. Qur\'on ham Nurdir — Undan' },
+    { n:95, arabic:'الْهَادِي', latin:'Al-Hodi', meaning:'Hidoyat qiluvchi', desc:'Xohlaganini to\'g\'ri yo\'lga boshlovchi. Hidoyat Uning qo\'lida — hech kim U bermasa hidoyat topmas' },
+    { n:96, arabic:'الْبَدِيعُ', latin:'Al-Badi\'', meaning:'Yangi yaratuvchi', desc:'Nusxasiz va o\'xshashsiz yangi narsalar yaratuvchi. Koinotdagi har bir narsa Uning ijodkorligining belgisi' },
+    { n:97, arabic:'الْبَاقِي', latin:'Al-Boqi', meaning:'Boqiy', desc:'Azaliy va abadiy mavjud bo\'luvchi. O\'lim va yo\'qolish Unga yetishmaydi. Faqat U mangu' },
+    { n:98, arabic:'الْوَارِثُ', latin:'Al-Voris', meaning:'Voris', desc:'Barcha mavjudot o\'tganidan keyin ham qoluvchi yagona Voris. Hamma mulk oxirida Unikiga qaytadi' },
+    { n:99, arabic:'الرَّشِيدُ', latin:'Ar-Rashid', meaning:'To\'g\'ri yo\'l ko\'rsatuvchi', desc:'Barcha narsani to\'g\'ri maqsad va hikmat bilan boshqaruvchi. Uning har bir ishi rejalashtirilgan va maqsadli' },
+];
+
+const plants = ['🌱','🌿','🌳','🌲','🌴','🌵','🌾','🌺','🌻','🌼','🌷','🌹','🥀','🏵️','💐','🌸','💮','🪷','🪴','🍀','🌰','🥜','🌶️','🍇','🍈','🍉','🍊','🍋','🍌','🍍'];
+
+// ===================== STATE =====================
+class RamadanTracker {
+    constructor() {
+        this.currentDay = this.detectCurrentDay();
+        this.userData = this.loadUserData();
+        this.namesFilter = 'all';
+        this.namesSearch = '';
+    }
+
+    detectCurrentDay() {
+        const start = new Date('2026-02-19');
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        start.setHours(0,0,0,0);
+        const diff = Math.floor((today - start) / 86400000) + 1;
+        return Math.min(Math.max(diff, 1), 30);
+    }
+
+    loadUserData() {
+        const key = `ramazon_${userId}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+            try { return JSON.parse(stored); } catch(e) {}
+        }
+        return {
+            days: Array.from({length:30}, (_,i) => ({
+                day: i+1, dailyTasks:{}, customTasks:[], zikr:{}, progress:0
+            }))
+        };
+    }
+
+    saveUserData() {
+        const key = `ramazon_${userId}`;
+        localStorage.setItem(key, JSON.stringify(this.userData));
+    }
+
+    getCurrentDayData() { return this.userData.days[this.currentDay-1]; }
+
+    setCurrentDay(day) { this.currentDay = day; this.render(); }
+
+    toggleDailyTask(taskId) {
+        const d = this.getCurrentDayData();
+        d.dailyTasks[taskId] = !d.dailyTasks[taskId];
+        this.updateProgress();
+        this.saveUserData();
+        this.render();
+
+        // Bot ga yuborish
+        syncToBot('task_update', {
+            day: this.currentDay,
+            task_id: taskId,
+            completed: d.dailyTasks[taskId]
+        });
+    }
+
+    toggleCustomTask(taskId) {
+        const d = this.getCurrentDayData();
+        const task = d.customTasks.find(t => t.id === taskId);
+        if (task) {
+            task.completed = !task.completed;
+            this.updateProgress();
+            this.saveUserData();
+            this.render();
+            syncToBot('task_update', { day: this.currentDay, task_id: taskId, completed: task.completed });
+        }
+    }
+
+    addCustomTask(title, desc, time) {
+        const d = this.getCurrentDayData();
+        d.customTasks.push({ id:'ct_'+Date.now(), title, desc, time, completed:false });
+        this.updateProgress();
+        this.saveUserData();
+        this.render();
+    }
+
+    deleteCustomTask(taskId) {
+        const d = this.getCurrentDayData();
+        d.customTasks = d.customTasks.filter(t => t.id !== taskId);
+        this.updateProgress();
+        this.saveUserData();
+        this.render();
+    }
+
+    updateZikr(id, amount) {
+        const d = this.getCurrentDayData();
+        const z = zikrList.find(z => z.id === id);
+        if (!d.zikr[id]) d.zikr[id] = 0;
+        d.zikr[id] = Math.max(0, Math.min(d.zikr[id]+amount, z.target));
+        this.saveUserData();
+        this.renderZikr();
+
+        // Bot ga yuborish
+        syncToBot('zikr_update', { day: this.currentDay, zikr_id: id, count: d.zikr[id] });
+    }
+
+    resetZikr(id) {
+        const d = this.getCurrentDayData();
+        d.zikr[id] = 0;
+        this.saveUserData();
+        this.renderZikr();
+        syncToBot('zikr_update', { day: this.currentDay, zikr_id: id, count: 0 });
+    }
+
+    // RamadanTracker klassi ichida:
+    updateProgress() {
+        const d = this.getCurrentDayData();
+        const allTasks = Object.values(defaultDailyTasks).flat();
+        const completedD = allTasks.filter(t => d.dailyTasks[t.id]).length;
+        const completedC = d.customTasks.filter(t => t.completed).length;
+        const total = allTasks.length + d.customTasks.length;
+        
+        d.progress = total > 0 ? Math.round(((completedD + completedC) / total) * 100) : 0;
+
+        // BOTGA YUBORISH QATORI O'CHIRILDI
+        this.saveUserData(); 
+        this.renderProgress(); // Vizual yangilash
+    }
+
+    getStats() {
+        const completedDays = this.userData.days.filter(d => d.progress >= 70).length;
+        const avgProgress = Math.round(
+        this.userData.days.reduce((s,d)=>s+d.progress,0) / this.userData.days.length);
+        const bestDay = Math.max(...this.userData.days.map(d => d.progress));
+        const streak = this.calculateStreak();
+        const completedTasks = this.userData.days.reduce((s,d) => {
+            const all = Object.values(defaultDailyTasks).flat();
+            return s + all.filter(t => d.dailyTasks[t.id]).length + d.customTasks.filter(t => t.completed).length;
+        }, 0);
+        return { completedDays, avgProgress, bestDay, streak, completedTasks };
+    }
+
+    calculateStreak() {
+        let s = 0;
+        for (let i = this.currentDay-1; i >= 0; i--) {
+            if (this.userData.days[i].progress >= 70) s++;
+            else break;
+        }
+        return s;
+    }
+
+    render() {
+        this.renderDaySelector();
+        this.renderDailyTasks();
+        this.renderCustomTasks();
+        this.renderZikr();
+        this.renderNames();
+        this.renderGarden();
+        this.renderStats();
+        this.renderProgress();
+        this.updateHeroStats();
+    }
+
+    renderDaySelector() {
+        const c = document.getElementById('daySelectorButtons');
+        const completed = this.userData.days.filter(d => d.progress >= 70).length;
+        document.getElementById('completedDaysCount').textContent = completed;
+        c.innerHTML = Array.from({length:30},(_,i) => {
+            const day = i+1;
+            const d = this.userData.days[i];
+            return `<button class="day-btn ${day===this.currentDay?'active':''} ${d.progress>=70?'completed':''}" onclick="tracker.setCurrentDay(${day})">${day}</button>`;
+        }).join('');
+    }
+
+    renderDailyTasks() {
+        const grid = document.getElementById('dailyTasksGrid');
+        const d = this.getCurrentDayData();
+        const icons = {ibodat:'🕌',ilm:'📚',axloq:'💎',nafs:'🧘',sadaqa:'🤲'};
+        const titles = {ibodat:'Ibodat',ilm:'Ilm',axloq:'Axloq',nafs:'Nafs',sadaqa:'Sadaqa'};
+        grid.innerHTML = Object.keys(defaultDailyTasks).map(cat => {
+            const tasks = defaultDailyTasks[cat];
+            const comp = tasks.filter(t => d.dailyTasks[t.id]).length;
+            return `<div class="card">
+                <div class="card-header">
+                    <div><div class="card-title">${titles[cat]}</div><div class="card-stats">✅ ${comp}/${tasks.length}</div></div>
+                    <div class="card-icon">${icons[cat]}</div>
+                </div>
+                <div class="task-list">
+                    ${tasks.map(t => `
+                        <div class="task-item ${d.dailyTasks[t.id]?'completed':''}" onclick="tracker.toggleDailyTask('${t.id}')">
+                            <div class="task-checkbox"><span class="task-checkbox-icon">✓</span></div>
+                            <div class="task-content"><div class="task-title">${t.title}</div><div class="task-desc">${t.desc}</div></div>
+                            ${t.time?`<div class="task-time">${t.time}</div>`:''}
+                        </div>`).join('')}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    renderCustomTasks() {
+        const list = document.getElementById('customTasksList');
+        const d = this.getCurrentDayData();
+        if (!d.customTasks.length) {
+            list.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text-light)"><div style="font-size:48px;margin-bottom:16px">📝</div><p>Hali maxsus vazifalar yo'q</p><p style="font-size:14px;margin-top:8px">Yuqoridagi "+" tugmasini bosing</p></div>`;
+            return;
+        }
+        list.innerHTML = d.customTasks.map(t => `
+            <div class="task-item ${t.completed?'completed':''}" onclick="tracker.toggleCustomTask('${t.id}')">
+                <div class="task-checkbox"><span class="task-checkbox-icon">✓</span></div>
+                <div class="task-content"><div class="task-title">${t.title}</div>${t.desc?`<div class="task-desc">${t.desc}</div>`:''}</div>
+                ${t.time?`<div class="task-time">${t.time}</div>`:''}
+                <button class="task-delete" onclick="event.stopPropagation();tracker.deleteCustomTask('${t.id}')">🗑️</button>
+            </div>`).join('');
+    }
+
+    renderZikr() {
+        const grid = document.getElementById('zikrGrid');
+        const d = this.getCurrentDayData();
+        grid.innerHTML = zikrList.map(z => {
+            const cur = d.zikr[z.id] || 0;
+            const prog = Math.round((cur/z.target)*100);
+            const done = cur >= z.target;
+            return `<div class="zikr-card" style="${done?'border:2px solid var(--success)':''}">
+                <div class="zikr-header">
+                    <div><div class="zikr-title">${done?'✅':''} ${z.title}</div></div>
+                    <div class="zikr-icon">${z.icon}</div>
+                </div>
+                <div class="zikr-arabic">${z.arabic}</div>
+                <div class="zikr-desc">${z.desc}</div>
+                <div class="zikr-fadl">💡 ${z.fadl}</div>
+                <div class="zikr-counter">
+                    <div class="zikr-count">${cur}</div>
+                    <div class="zikr-target">/ ${z.target} marta</div>
+                </div>
+                <div class="progress-bar-container" style="margin-bottom:12px">
+                    <div class="progress-bar-fill" style="width:${prog}%"></div>
+                </div>
+                <div class="zikr-buttons">
+                    <button class="btn btn-danger" onclick="tracker.resetZikr('${z.id}')">↺</button>
+                    <button class="btn btn-secondary" onclick="tracker.updateZikr('${z.id}',-1)">−1</button>
+                    <button class="btn btn-primary" onclick="tracker.updateZikr('${z.id}',1)">+1</button>
+                    <button class="btn btn-primary" onclick="tracker.updateZikr('${z.id}',10)">+10</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    renderNames() {
+        const grid = document.getElementById('namesGrid');
+        let names = allahNames;
+
+        if (this.namesSearch) {
+            const q = this.namesSearch.toLowerCase();
+            names = names.filter(n =>
+                n.latin.toLowerCase().includes(q) ||
+                n.meaning.toLowerCase().includes(q) ||
+                n.desc.toLowerCase().includes(q)
+            );
+        } else if (this.namesFilter === 'today') {
+            const start = (this.currentDay - 1) * 3;
+            names = allahNames.slice(start, start + 3);
+        }
+
+        grid.innerHTML = names.map(n => `
+            <div class="name-card" title="${n.desc}">
+                <div class="name-number">#${n.n}</div>
+                <div class="name-arabic">${n.arabic}</div>
+                <div class="name-latin">${n.latin}</div>
+                <div class="name-meaning">${n.meaning}</div>
+                <div class="name-desc">${n.desc}</div>
+            </div>`).join('');
+    }
+
+    renderGarden() {
+        const d_grown = this.userData.days.filter(d => d.progress >= 70).length;
+        document.getElementById('gardenCount').textContent = d_grown;
+        document.getElementById('gardenProgress').style.width = `${(d_grown/30)*100}%`;
+        document.getElementById('gardenGrid').innerHTML = Array.from({length:30},(_,i) => {
+            const grown = this.userData.days[i].progress >= 70;
+            return `<div class="garden-plant ${grown?'grown':''}"><span class="plant-icon">${plants[i]}</span><span class="plant-label">${i+1}</span></div>`;
+        }).join('');
+    }
+
+
+    renderStats() {
+        const s = this.getStats();
+        const items = [
+            {label:'Bajarilgan vazifalar',value:s.completedTasks,icon:'✅'},
+            {label:"O'rtacha progress",value:s.avgProgress+'%',icon:'📊'},
+            {label:'Eng yaxshi kun',value:s.bestDay+'%',icon:'🏆'},
+            {label:"To'liq kunlar",value:s.completedDays,icon:'🌟'},
+            {label:'Hozirgi streak',value:s.streak,icon:'🔥'},
+            {label:'Jami kun',value:'30',icon:'📅'},
+        ];
+        document.getElementById('statsGrid').innerHTML = items.map(i => `
+            <div class="stat-card">
+                <div class="stat-icon">${i.icon}</div>
+                <div class="stat-number">${i.value}</div>
+                <div class="stat-label">${i.label}</div>
+            </div>`).join('');
+
+        document.getElementById('historyChart').innerHTML = `
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(30px,1fr));gap:8px">
+                ${this.userData.days.map((d,i) => {
+                    const h = Math.max(d.progress, 5);
+                    const col = d.progress>=70?'var(--success)':d.progress>=40?'var(--warning)':'var(--light)';
+                    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+                        <div style="height:80px;display:flex;align-items:flex-end;width:100%">
+                            <div style="width:100%;height:${h}%;background:${col};border-radius:4px 4px 0 0"></div>
+                        </div>
+                        <div style="font-size:10px;color:var(--text-light)">${i+1}</div>
+                    </div>`;
+                }).join('')}
+            </div>`;
+    }
+
+    renderProgress() {
+        const d = this.getCurrentDayData();
+        const percent = d.progress || 0;
+        
+        // Progress matni
+        const percentEl = document.getElementById('progressPercent');
+        if (percentEl) percentEl.textContent = percent + '%';
+        
+        // Progress bar chizig'i
+        const barEl = document.getElementById('progressBar');
+        if (barEl) barEl.style.width = percent + '%';
+        
+        // Status matni
+        const statusEl = document.getElementById('syncStatus');
+        if (statusEl && percent > 0) {
+            statusEl.textContent = `Bugun ${percent}% bajarildi`;
+        }
+    }
+
+    updateHeroStats() {
+        const d = this.getCurrentDayData();
+        const s = this.getStats();
+        document.getElementById('currentDay').textContent = this.currentDay;
+        document.getElementById('todayProgress').textContent = d.progress+'%';
+        document.getElementById('totalCompleted').textContent = s.completedTasks;
+        document.getElementById('streakDays').textContent = s.streak;
+    }
+}
+
+// ===================== GLOBAL FUNKSIYALAR =====================
+const tracker = new RamadanTracker();
+tracker.render();
+
+function switchTab(tabName, btn) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    document.getElementById(tabName).classList.add('active');
+}
+
+function openAddTaskModal() { document.getElementById('addTaskModal').classList.add('active'); }
+function closeAddTaskModal() { document.getElementById('addTaskModal').classList.remove('active'); document.getElementById('addTaskForm').reset(); }
+
+function filterNames(val) {
+    tracker.namesSearch = val;
+    tracker.renderNames();
+}
+
+function setNamesFilter(filter, btn) {
+    tracker.namesFilter = filter;
+    tracker.namesSearch = '';
+    document.querySelector('.names-search').value = '';
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    tracker.renderNames();
+}
+
+document.getElementById('addTaskForm').addEventListener('submit', e => {
+    e.preventDefault();
+    tracker.addCustomTask(
+        document.getElementById('taskTitle').value,
+        document.getElementById('taskDesc').value,
+        document.getElementById('taskTime').value
+    );
+    closeAddTaskModal();
+});
+
+document.getElementById('addTaskModal').addEventListener('click', e => {
+    if (e.target.classList.contains('modal')) closeAddTaskModal();
+});
+
+if (tg?.themeParams) {
+    document.documentElement.style.setProperty('--tg-bg', tg.themeParams.bg_color);
+}
+
+console.log('🌙 Ramazon Tracker | User:', userName, '| ID:', userId);
+</script>
+</body>
+</html>

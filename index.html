@@ -370,55 +370,91 @@ if (tg) { tg.expand(); tg.ready(); }
 
 const userId = tg?.initDataUnsafe?.user?.id || 'demo_' + Math.random().toString(36).substr(2,6);
 const userName = tg?.initDataUnsafe?.user?.first_name || 'Foydalanuvchi';
+const initData = tg?.initData || '';
 
-// ===================== BOT GA YUBORISH =====================
-let syncTimer = null;
-// ===================== BOT GA YUBORISH (O'ZGARTIRILDI) =====================
-function syncToBot(type, data) {
-    // Har bir klikda botga yuborish o'chirildi
-    // Faqat brauzer xotirasiga saqlaymiz
-    tracker.saveUserData();
-    
-    // Vizual ko'rsatkich (ixtiyoriy)
-    const statusEl = document.getElementById('syncStatus');
-    if (statusEl) {
-        statusEl.textContent = '✍️ O‘zgarishlar kiritildi (Saqlashni bosing)';
-    }
-}
+// ===================== API URL =====================
+// MUHIM: Quyidagi qatorni o'z Railway URL ingizga o'zgartiring!
+// Misol: const API_BASE = 'https://ramazon-bot-production.up.railway.app';
+const API_BASE = 'https://ramazontgbot-production.up.railway.app';
 
-// YANGI: Faqat shu funksiya chaqirilganda botga ma'lumot ketadi
-function manualSave() {
-    if (!tg) {
-        alert("Telegram muhiti topilmadi!");
-        return;
-    }
+// ===================== SERVER SINXRONIZATSIYASI =====================
+let serverCurrentDay = null;
 
-    const d = tracker.getCurrentDayData();
-    const stats = tracker.getStats();
-
-    // Barcha ma'lumotlarni bitta paketga yig'amiz
-    const bulkData = {
-        type: "tasks_bulk",
-        day: tracker.currentDay,
-        dailyTasks: d.dailyTasks,
-        customTasks: d.customTasks,
-        zikrs: d.zikr,
-        progress: d.progress,
-        stats: stats
-    };
-
+async function loadFromServer() {
     try {
-        // Botga bittada yuboramiz
-        tg.sendData(JSON.stringify(bulkData));
-        // Web Appni yopamiz (chunki ma'lumot ketgach, Telegram oynani yopishni tavsiya qiladi)
-        tg.close();
+        const params = new URLSearchParams({ user_id: userId });
+        if (initData) params.append('init_data', initData);
+        const res = await fetch(`${API_BASE}/api/state?${params}`, { signal: AbortSignal.timeout(6000) });
+        if (!res.ok) throw new Error('Server xatosi: ' + res.status);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Server xatosi');
+        serverCurrentDay = data.current_day;
+        return data.days;
     } catch (e) {
-        console.error("Saqlashda xato:", e);
-        alert("Xatolik yuz berdi!");
+        console.warn('Server dan yuklab bolmadi:', e.message);
+        return null;
     }
 }
 
+async function saveToServer(type, payload) {
+    try {
+        const body = { type, user_id: userId, init_data: initData, ...payload };
+        const res = await fetch(`${API_BASE}/api/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(6000)
+        });
+        const data = await res.json();
+        return data.ok === true;
+    } catch (e) {
+        console.warn('Server saqlashda xato:', e.message);
+        return false;
+    }
+}
 
+function syncToBot(type, data) {
+    // 1. localStoragega saqlaymiz (tez)
+    tracker.saveUserData();
+
+    // 2. Serverga async yuboramiz (background)
+    const payload = { day: data.day || tracker.currentDay, ...data };
+    saveToServer(type, payload).then(ok => {
+        const statusEl = document.getElementById('syncStatus');
+        if (statusEl) {
+            statusEl.textContent = ok ? '✅ Saqlandi' : '⚠️ Faqat qurilmada saqlandi';
+            setTimeout(() => {
+                const d = tracker.getCurrentDayData();
+                if (statusEl) statusEl.textContent = 'Bugun ' + (d.progress || 0) + '% bajarildi';
+            }, 2000);
+        }
+    });
+}
+
+function manualSave() {
+    const d = tracker.getCurrentDayData();
+    const ramadanDay = tracker.currentDay;
+    const tasksArr = Object.entries(d.dailyTasks || {}).map(([id, completed]) => ({ id, completed }));
+    const customArr = (d.customTasks || []).map(t => ({ id: t.id, completed: t.completed, title: t.title, desc: t.desc, time: t.time }));
+    const payload = {
+        day: ramadanDay,
+        tasks: [...tasksArr, ...customArr],
+        progress: d.progress || 0
+    };
+    saveToServer('tasks_bulk', payload).then(ok => {
+        if (ok) {
+            const statusEl = document.getElementById('syncStatus');
+            if (statusEl) statusEl.textContent = '✅ Serverga saqlandi!';
+            setTimeout(() => {
+                const d2 = tracker.getCurrentDayData();
+                const statusEl2 = document.getElementById('syncStatus');
+                if (statusEl2) statusEl2.textContent = 'Bugun ' + (d2.progress || 0) + '% bajarildi';
+            }, 2000);
+        } else {
+            alert('Serverga saqlanmadi. Internet aloqasini tekshiring.');
+        }
+    });
+}
 // ===================== MA'LUMOTLAR =====================
 
 const defaultDailyTasks = {
@@ -647,13 +683,48 @@ class RamadanTracker {
         const key = `ramazon_${userId}`;
         const stored = localStorage.getItem(key);
         if (stored) {
-            try { return JSON.parse(stored); } catch(e) {}
+            try {
+                const parsed = JSON.parse(stored);
+                // locked maydonini tekshirib qo'shamiz
+                if (parsed.days) {
+                    parsed.days.forEach((d, i) => {
+                        if (d.locked === undefined) d.locked = false;
+                        if (!d.customTasks) d.customTasks = [];
+                        if (!d.zikr) d.zikr = {};
+                        if (!d.dailyTasks) d.dailyTasks = {};
+                    });
+                }
+                return parsed;
+            } catch(e) {}
         }
         return {
             days: Array.from({length:30}, (_,i) => ({
-                day: i+1, dailyTasks:{}, customTasks:[], zikr:{}, progress:0
+                day: i+1, dailyTasks:{}, customTasks:[], zikr:{}, progress:0, locked:false
             }))
         };
+    }
+
+    mergeServerData(serverDays) {
+        // Server ma'lumotlari ustun — har kun uchun server datani apply qilamiz
+        if (!serverDays || !serverDays.length) return;
+        for (const sd of serverDays) {
+            const idx = sd.day - 1;
+            if (idx < 0 || idx >= 30) continue;
+            // Server da bor bo'lsa, server ma'lumotini olamiz
+            if (sd.dailyTasks && Object.keys(sd.dailyTasks).length > 0) {
+                this.userData.days[idx].dailyTasks = sd.dailyTasks;
+            }
+            if (sd.zikr && Object.keys(sd.zikr).length > 0) {
+                this.userData.days[idx].zikr = sd.zikr;
+            }
+            if (sd.progress > 0) {
+                this.userData.days[idx].progress = sd.progress;
+            }
+            // O'tgan kunlarni lock qilish
+            this.userData.days[idx].locked = sd.locked || false;
+        }
+        this.saveUserData();
+        this.render();
     }
 
     saveUserData() {
@@ -667,6 +738,11 @@ class RamadanTracker {
 
     toggleDailyTask(taskId) {
         const d = this.getCurrentDayData();
+        if (d.locked) {
+            const statusEl = document.getElementById('syncStatus');
+            if (statusEl) { statusEl.textContent = '🔒 Bu kun yakunlangan — o\'zgartirib bo\'lmaydi'; setTimeout(()=>{statusEl.textContent='';},2500); }
+            return;
+        }
         d.dailyTasks[taskId] = !d.dailyTasks[taskId];
         this.updateProgress();
         this.saveUserData();
@@ -682,6 +758,11 @@ class RamadanTracker {
 
     toggleCustomTask(taskId) {
         const d = this.getCurrentDayData();
+        if (d.locked) {
+            const statusEl = document.getElementById('syncStatus');
+            if (statusEl) { statusEl.textContent = '🔒 Bu kun yakunlangan — o\'zgartirib bo\'lmaydi'; setTimeout(()=>{statusEl.textContent='';},2500); }
+            return;
+        }
         const task = d.customTasks.find(t => t.id === taskId);
         if (task) {
             task.completed = !task.completed;
@@ -791,9 +872,13 @@ class RamadanTracker {
     renderDailyTasks() {
         const grid = document.getElementById('dailyTasksGrid');
         const d = this.getCurrentDayData();
+        const isLocked = d.locked || false;
         const icons = {ibodat:'🕌',ilm:'📚',axloq:'💎',nafs:'🧘',sadaqa:'🤲'};
         const titles = {ibodat:'Ibodat',ilm:'Ilm',axloq:'Axloq',nafs:'Nafs',sadaqa:'Sadaqa'};
-        grid.innerHTML = Object.keys(defaultDailyTasks).map(cat => {
+        const lockBanner = isLocked
+            ? `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:12px;padding:10px 16px;margin-bottom:12px;color:#856404;font-weight:600;text-align:center;font-size:14px">🔒 Bu kun yakunlangan — o'zgartirish mumkin emas</div>`
+            : '';
+        const tasksHtml = Object.keys(defaultDailyTasks).map(cat => {
             const tasks = defaultDailyTasks[cat];
             const comp = tasks.filter(t => d.dailyTasks[t.id]).length;
             return `<div class="card">
@@ -803,7 +888,7 @@ class RamadanTracker {
                 </div>
                 <div class="task-list">
                     ${tasks.map(t => `
-                        <div class="task-item ${d.dailyTasks[t.id]?'completed':''}" onclick="tracker.toggleDailyTask('${t.id}')">
+                        <div class="task-item ${d.dailyTasks[t.id]?'completed':''}" ${!isLocked ? `onclick="tracker.toggleDailyTask('${t.id}')"` : 'style="cursor:default;opacity:0.85"'}>
                             <div class="task-checkbox"><span class="task-checkbox-icon">✓</span></div>
                             <div class="task-content"><div class="task-title">${t.title}</div><div class="task-desc">${t.desc}</div></div>
                             ${t.time?`<div class="task-time">${t.time}</div>`:''}
@@ -811,6 +896,7 @@ class RamadanTracker {
                 </div>
             </div>`;
         }).join('');
+        grid.innerHTML = lockBanner + tasksHtml;
     }
 
     renderCustomTasks() {
@@ -961,7 +1047,26 @@ class RamadanTracker {
 
 // ===================== GLOBAL FUNKSIYALAR =====================
 const tracker = new RamadanTracker();
+
+// Avval local ma'lumot bilan render qilamiz
 tracker.render();
+
+// Keyin serverdan yuklab, ma'lumotlarni yangilaymiz
+(async () => {
+    const statusEl = document.getElementById('syncStatus');
+    if (statusEl) statusEl.textContent = '🔄 Sinxronlanmoqda...';
+    const serverDays = await loadFromServer();
+    if (serverDays) {
+        tracker.mergeServerData(serverDays);
+        if (statusEl) statusEl.textContent = '✅ Sinxronlandi';
+    } else {
+        if (statusEl) statusEl.textContent = '⚠️ Offline rejim (server bilan boglanmadi)';
+    }
+    setTimeout(() => {
+        const d = tracker.getCurrentDayData();
+        if (statusEl) statusEl.textContent = 'Bugun ' + (d.progress || 0) + '% bajarildi';
+    }, 3000);
+})();
 
 function switchTab(tabName, btn) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
